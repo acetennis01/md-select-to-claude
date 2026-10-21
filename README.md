@@ -100,6 +100,7 @@ The right-click menu refreshes from the bridge every 30 seconds.
 
 | Toast / symptom | Fix |
 |---|---|
+| Nothing happens, no toast | the extension was reloaded while the tab was open; the extension re-injects itself on the next right-click, or reload the tab. Check `chrome://extensions` → the card's **Errors** button |
 | Bridge not running | `mdclaude start <folder>` |
 | Agent X is not connected | `/ide` in that session → **Markdown Viewer (X)** |
 | Could not read the file | **Allow access to file URLs** for this extension in `chrome://extensions` |

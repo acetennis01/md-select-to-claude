@@ -132,12 +132,24 @@ async function readRaw(url, { maxAgeMs = 1500 } = {}) {
   return text;
 }
 
+// After the extension is reloaded, content scripts in already-open tabs are
+// orphaned and can't receive messages. Re-inject on demand instead of making
+// the user reload the page.
+async function messageTab(tabId, msg) {
+  try {
+    return await chrome.tabs.sendMessage(tabId, msg);
+  } catch {
+    await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
+    return chrome.tabs.sendMessage(tabId, msg);
+  }
+}
+
 async function getSelectionFromTab(tabId) {
-  return chrome.tabs.sendMessage(tabId, { type: 'get-selection' });
+  return messageTab(tabId, { type: 'get-selection' });
 }
 
 async function toast(tabId, text, kind = 'ok') {
-  try { await chrome.tabs.sendMessage(tabId, { type: 'toast', text, kind }); } catch {}
+  try { await messageTab(tabId, { type: 'toast', text, kind }); } catch {}
 }
 
 async function locate(tab, selectionText) {
