@@ -109,10 +109,12 @@ Other things you can do:
 | Send to every connected session | right-click → **All connected agents** |
 | Re-send to the agent you used last | **Alt+K** (change at `chrome://extensions/shortcuts`) |
 | See which agents are connected | `mdclaude status`, or the extension's options page |
-| Stop the bridge | `mdclaude stop` |
+| Stop the bridge | `mdclaude stop` (refuses while sessions are connected; `--force` overrides) |
 | Run the bridge in the foreground to watch its log | `mdclaude` (then `mdclaude run A` in other terminals) |
+| Start the bridge in the background without opening a session | `mdclaude start` |
 | Pass flags to claude | `mdclaude run A -- --resume` |
-| Connect a Claude Code you already have open | type `/ide` in it and pick **Markdown Viewer (A)** |
+| Connect a Claude Code you already have open | `mdclaude start` if needed, then type `/ide` in that session and pick **Markdown Viewer (A)** |
+| Make a slot for an open session under a new name | `mdclaude add review`, then `/ide` → **Markdown Viewer (review)** |
 | Start with a fixed set of agents | `mdclaude --agents design,backend,qa` or `mdclaude --agents 4` |
 
 Mentions stack: send two ranges, even from two different files, and both

@@ -30,8 +30,10 @@ const VERSION = '0.2.0';
 
 const HELP = `Usage:
   mdclaude [serve] [workspaceFolder ...] [--agents A,B,...] [--port N]
+  mdclaude start [workspaceFolder ...] [--agents A,B,...]
   mdclaude run [agent] [-- claude args...]
-  mdclaude stop
+  mdclaude add <agent>
+  mdclaude stop [--force]
   mdclaude status
 
 serve (default)  Start the bridge and keep it in the foreground.
@@ -45,6 +47,13 @@ serve (default)  Start the bridge and keep it in the foreground.
   --port N          API port the Chrome extension talks to (default 41417).
                     Agent slots use N+1, N+2, ...
 
+start            Same as serve, but in the background (log: ~/.mdclaude/bridge.log).
+                 Use this when you'll attach sessions you already have open,
+                 by typing /ide in them and picking "Markdown Viewer (<agent>)".
+
+add <agent>      Create an agent slot on the running bridge without launching
+                 anything, so an open Claude Code can /ide into it.
+
 run [agent]      Launch Claude Code already connected as that agent, e.g.
                  "mdclaude run A". An agent that doesn't exist yet is created.
                  With no name, the first idle agent is used, or a new one made.
@@ -52,14 +61,15 @@ run [agent]      Launch Claude Code already connected as that agent, e.g.
                  the current folder (log: ~/.mdclaude/bridge.log).
                  Anything after "--" is passed to claude: mdclaude run B -- --resume
 
-stop             Stop a background bridge started by "run".
+stop             Stop a background bridge. Refuses while sessions are connected
+                 unless --force is given.
 status           Show the bridge's agents and which are connected.
 `;
 
 function parseArgs(argv) {
   const out = { cmd: 'serve', port: 41417, workspaceFolders: [], agents: ['A', 'B'], quiet: false, agent: null, claudeArgs: [] };
   const rest = [...argv];
-  if (['serve', 'run', 'stop', 'status'].includes(rest[0])) out.cmd = rest.shift();
+  if (['serve', 'start', 'run', 'add', 'stop', 'status'].includes(rest[0])) out.cmd = rest.shift();
 
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
@@ -69,10 +79,12 @@ function parseArgs(argv) {
     else if (a === '--agents' || a === '-a') out.agents = parseAgents(rest[++i]);
     else if (a.startsWith('--agents=')) out.agents = parseAgents(a.slice(9));
     else if (a === '--quiet' || a === '-q') out.quiet = true;
+    else if (a === '--force' || a === '-f') out.force = true;
     else if (a === '--help' || a === '-h') { console.log(HELP); process.exit(0); }
-    else if (out.cmd === 'run' && !out.agent) out.agent = a;
+    else if ((out.cmd === 'run' || out.cmd === 'add') && !out.agent) out.agent = a;
     else out.workspaceFolders.push(path.resolve(a));
   }
+  if (out.cmd === 'add' && !out.agent) throw new Error('add needs an agent name, e.g. "mdclaude add qa"');
   if (!out.workspaceFolders.length) out.workspaceFolders.push(process.cwd());
   return out;
 }
@@ -696,9 +708,31 @@ async function cmdRun(args) {
   process.exit(r.status ?? 0);
 }
 
+async function cmdStart(args) {
+  const { status, started } = await ensureBridge(args);
+  console.log(started
+    ? `[mdclaude] bridge started in the background for ${args.workspaceFolders.join(', ')}`
+    : `[mdclaude] bridge already running for ${status.workspaceFolders.join(', ')}`);
+  for (const a of status.agents) console.log(`    ${a.name.padEnd(8)} "${a.ideName}"`);
+  console.log('In each open Claude Code, type /ide and pick its entry. Or: mdclaude run <agent>');
+}
+
+async function cmdAdd(args) {
+  const status = await fetchStatus(args.port);
+  if (!status) { console.error(`[mdclaude] no bridge running on port ${args.port}; run "mdclaude start" first`); process.exit(1); }
+  const agent = await addAgentRemote(args.port, args.agent);
+  console.log(`[mdclaude] in a Claude Code session, type /ide and pick "${agent.ideName}"`);
+}
+
 async function cmdStop(args) {
   const status = await fetchStatus(args.port);
   if (!status) { console.log(`[mdclaude] no bridge running on port ${args.port}`); return; }
+  const live = status.agents.filter((a) => a.connected);
+  if (live.length && !args.force) {
+    console.error(`[mdclaude] not stopping: ${live.length} session(s) still connected (${live.map((a) => a.name).join(', ')})`);
+    console.error(`[mdclaude] bridge serves ${status.workspaceFolders.join(', ')}. Use "mdclaude stop --force" to disconnect them.`);
+    process.exit(1);
+  }
   try {
     process.kill(status.pid, 'SIGTERM');
     console.log(`[mdclaude] stopped bridge (pid ${status.pid})`);
@@ -728,7 +762,7 @@ if (isMain) {
   try { args = parseArgs(process.argv.slice(2)); }
   catch (e) { console.error(`[mdclaude] ${e.message}\n`); console.error(HELP); process.exit(1); }
 
-  const run = { serve: cmdServe, run: cmdRun, stop: cmdStop, status: cmdStatus }[args.cmd];
+  const run = { serve: cmdServe, start: cmdStart, run: cmdRun, add: cmdAdd, stop: cmdStop, status: cmdStatus }[args.cmd];
   Promise.resolve(run(args)).catch((e) => {
     console.error(`[mdclaude] ${e?.message ?? e}`);
     process.exit(1);
