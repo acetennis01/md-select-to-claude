@@ -1,0 +1,14 @@
+{
+  "name": "md-select-to-claude-bridge",
+  "version": "0.1.0",
+  "description": "Bridge that lets a Chrome markdown viewer send selections to Claude Code as IDE context",
+  "type": "module",
+  "bin": { "mdclaude": "./bridge.js" },
+  "main": "./bridge.js",
+  "scripts": {
+    "start": "node bridge.js",
+    "test": "node --test ../test/"
+  },
+  "engines": { "node": ">=20" },
+  "license": "MIT"
+}

@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Send Markdown Selection to Claude Code",
+  "version": "0.2.0",
+  "description": "Highlight text in a rendered markdown file (e.g. via Markdown Viewer), right-click, and send it to Claude Code as an @file#L10-20 mention.",
+  "permissions": ["contextMenus", "storage", "alarms"],
+  "host_permissions": ["file:///*", "http://127.0.0.1/*", "http://localhost/*"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "content_scripts": [
+    {
+      "matches": ["file:///*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "commands": {
+    "send-selection": {
+      "suggested_key": { "default": "Alt+K", "mac": "Alt+K" },
+      "description": "Send the current selection to the last-used Claude Code agent"
+    }
+  },
+  "options_ui": { "page": "options.html", "open_in_tab": false }
+}
