@@ -49,7 +49,7 @@ Chrome (rendered .md)             bridge (node)                 Claude Code
 **1. Get the code**
 
 ```bash
-git clone <this repository> md-select-to-claude
+git clone https://github.com/acetennis01/md-select-to-claude.git
 cd md-select-to-claude
 ```
 
