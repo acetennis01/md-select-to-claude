@@ -6,7 +6,7 @@ title: Order Checkout and Payment Processing Service Spec
 
 ## Authors
 
-- Abhi
+- ABhiram
 
 ## 1. Overview
 
@@ -41,6 +41,7 @@ and payment capture, and it is the *only* writer of the `orders` table.
 ```json
 {
   "cartId": "abc123",
+  "name": "ABhiram",
   "paymentMethod": "card"
 }
 ```

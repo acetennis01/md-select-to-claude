@@ -33,6 +33,7 @@ const HELP = `Usage:
   mdclaude start [workspaceFolder ...] [--agents A,B,...]
   mdclaude run [agent] [-- claude args...]
   mdclaude add <agent>
+  mdclaude stop <agent>          (alias: remove, rm)
   mdclaude stop [--force]
   mdclaude status
 
@@ -62,7 +63,10 @@ run [agent]      Launch Claude Code already connected as that agent, e.g.
                  the current folder (log: ~/.mdclaude/bridge.log).
                  Anything after "--" is passed to claude: mdclaude run B -- --resume
 
-stop             Stop a background bridge. Refuses while sessions are connected
+stop <agent>     Remove just that agent: its session is disconnected and its
+                 /ide entry disappears. Other agents and the bridge keep going.
+
+stop             Stop the whole bridge. Refuses while sessions are connected
                  unless --force is given.
 status           Show the bridge's agents and which are connected.
 `;
@@ -70,7 +74,8 @@ status           Show the bridge's agents and which are connected.
 function parseArgs(argv) {
   const out = { cmd: 'serve', port: 41417, workspaceFolders: [], agents: [], quiet: false, agent: null, claudeArgs: [] };
   const rest = [...argv];
-  if (['serve', 'start', 'run', 'add', 'stop', 'status'].includes(rest[0])) out.cmd = rest.shift();
+  if (['serve', 'start', 'run', 'add', 'remove', 'rm', 'stop', 'status'].includes(rest[0])) out.cmd = rest.shift();
+  if (out.cmd === 'rm') out.cmd = 'remove';
 
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
@@ -82,10 +87,12 @@ function parseArgs(argv) {
     else if (a === '--quiet' || a === '-q') out.quiet = true;
     else if (a === '--force' || a === '-f') out.force = true;
     else if (a === '--help' || a === '-h') { console.log(HELP); process.exit(0); }
-    else if ((out.cmd === 'run' || out.cmd === 'add') && !out.agent) out.agent = a;
+    else if (['run', 'add', 'remove', 'stop'].includes(out.cmd) && !out.agent) out.agent = a;
     else out.workspaceFolders.push(path.resolve(a));
   }
   if (out.cmd === 'add' && !out.agent) throw new Error('add needs an agent name, e.g. "mdclaude add qa"');
+  if (out.cmd === 'remove' && !out.agent) throw new Error('remove needs an agent name, e.g. "mdclaude remove qa"');
+  if (out.cmd === 'stop' && out.agent) out.cmd = 'remove'; // "mdclaude stop qa" removes just that agent
   if (!out.workspaceFolders.length) out.workspaceFolders.push(process.cwd());
   return out;
 }
@@ -455,6 +462,18 @@ export function createBridge(opts) {
     throw new Error('no free port for a new agent');
   }
 
+  // Remove one slot: disconnects its sessions, closes its port, deletes its lock file.
+  async function removeAgent(rawName) {
+    const slot = findByName(rawName);
+    if (!slot) throw new Error(`no agent "${rawName}"`);
+    const hadConnected = slot.connected;
+    await slot.stop();
+    slots.splice(slots.indexOf(slot), 1);
+    byName.delete(slot.name);
+    log(`removed agent ${slot.name}${hadConnected ? ` (disconnected ${hadConnected} session(s))` : ''}`);
+    return { name: slot.name, disconnected: hadConnected };
+  }
+
   function readJson(req) {
     return new Promise((resolve, reject) => {
       const chunks = [];
@@ -472,7 +491,7 @@ export function createBridge(opts) {
       'content-type': 'application/json',
       'access-control-allow-origin': '*',
       'access-control-allow-headers': 'content-type',
-      'access-control-allow-methods': 'GET, POST, OPTIONS',
+      'access-control-allow-methods': 'GET, POST, DELETE, OPTIONS',
     });
     res.end(JSON.stringify(body));
   }
@@ -522,6 +541,15 @@ export function createBridge(opts) {
     try {
       if (req.method === 'GET' && url.pathname === '/status') return sendJson(res, 200, statusBody());
 
+      if (req.method === 'DELETE' && url.pathname.startsWith('/agents/')) {
+        const name = decodeURIComponent(url.pathname.slice('/agents/'.length));
+        try {
+          return sendJson(res, 200, { ok: true, ...(await removeAgent(name)) });
+        } catch (e) {
+          return sendJson(res, 404, { ok: false, error: e.message, agents: slots.map((s) => s.name) });
+        }
+      }
+
       if (req.method === 'POST' && url.pathname === '/agents') {
         const body = await readJson(req);
         try {
@@ -569,6 +597,7 @@ export function createBridge(opts) {
     port,
     slots,
     addAgent,
+    removeAgent,
     status: statusBody,
     async start() {
       await new Promise((resolve, reject) => {
@@ -734,6 +763,20 @@ async function cmdAdd(args) {
   console.log(`[mdclaude] in a Claude Code session, type /ide and pick "${agent.ideName}"`);
 }
 
+async function cmdRemove(args) {
+  const status = await fetchStatus(args.port);
+  if (!status) { console.error(`[mdclaude] no bridge running on port ${args.port}`); process.exit(1); }
+  const res = await fetch(`http://127.0.0.1:${args.port}/agents/${encodeURIComponent(args.agent)}`, { method: 'DELETE' });
+  const body = await res.json();
+  if (!body.ok) {
+    console.error(`[mdclaude] ${body.error}${body.agents?.length ? ` (agents: ${body.agents.join(', ')})` : ''}`);
+    process.exit(1);
+  }
+  console.log(`[mdclaude] removed agent ${body.name}${body.disconnected ? ` and disconnected its ${body.disconnected} session(s)` : ''}`);
+  const left = (await fetchStatus(args.port))?.agents ?? [];
+  console.log(left.length ? `[mdclaude] remaining: ${left.map((a) => a.name).join(', ')}` : '[mdclaude] no agents left; the bridge is still running (mdclaude stop to end it)');
+}
+
 async function cmdStop(args) {
   const status = await fetchStatus(args.port);
   if (!status) { console.log(`[mdclaude] no bridge running on port ${args.port}`); return; }
@@ -773,7 +816,7 @@ if (isMain) {
   try { args = parseArgs(process.argv.slice(2)); }
   catch (e) { console.error(`[mdclaude] ${e.message}\n`); console.error(HELP); process.exit(1); }
 
-  const run = { serve: cmdServe, start: cmdStart, run: cmdRun, add: cmdAdd, stop: cmdStop, status: cmdStatus }[args.cmd];
+  const run = { serve: cmdServe, start: cmdStart, run: cmdRun, add: cmdAdd, remove: cmdRemove, stop: cmdStop, status: cmdStatus }[args.cmd];
   Promise.resolve(run(args)).catch((e) => {
     console.error(`[mdclaude] ${e?.message ?? e}`);
     process.exit(1);

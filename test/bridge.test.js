@@ -262,6 +262,35 @@ test('agents can be added at runtime and routed to', async () => {
   client.close();
 });
 
+test('removing one agent leaves the others and the bridge running', async () => {
+  const names = () => bridge.slots.map((s) => s.name);
+  assert.ok(names().includes('qa'));
+  const qa = bridge.slots.find((s) => s.name === 'qa');
+  const { client } = await connect(qa.port, qa.authToken);
+  await handshake(client);
+
+  const res = await fetch(`http://127.0.0.1:${PORT}/agents/qa`, { method: 'DELETE' }).then((r) => r.json());
+  assert.equal(res.ok, true);
+  assert.equal(res.name, 'qa');
+  assert.equal(res.disconnected, 1);
+  assert.ok(!names().includes('qa'));
+  assert.ok(!fs.existsSync(qa.lockPath));
+
+  // its port is closed, the rest still answer
+  await assert.rejects(connect(qa.port, qa.authToken));
+  const s = await status();
+  assert.deepEqual(s.agents.map((a) => a.name), ['A', 'B']);
+  for (const slot of bridge.slots) assert.ok(fs.existsSync(slot.lockPath));
+
+  // unknown name
+  const bad = await fetch(`http://127.0.0.1:${PORT}/agents/nope`, { method: 'DELETE' }).then((r) => r.json());
+  assert.equal(bad.ok, false);
+  assert.deepEqual(bad.agents, ['A', 'B']);
+
+  // can be re-added afterwards
+  assert.equal((await post('/agents', { name: 'qa' })).ok, true);
+});
+
 test('large payloads use the 16-bit / 64-bit length forms', () => {
   for (const n of [10, 200, 70000]) {
     const text = 'x'.repeat(n);

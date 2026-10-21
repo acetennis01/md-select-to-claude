@@ -88,7 +88,8 @@ file at the same moment; the bridge routes, it doesn't merge.
 | `mdclaude add <name>` | create an agent; then `/ide` in an open session |
 | `mdclaude run [name] [-- claude args]` | new Claude Code connected as that agent; creates it if needed; no name = idle agent or next letter |
 | `mdclaude status` | agents and who's connected |
-| `mdclaude stop [--force]` | stop the bridge; refuses while sessions are connected unless forced |
+| `mdclaude stop <name>` | remove just that agent (disconnects its session); others keep running |
+| `mdclaude stop [--force]` | stop the whole bridge; refuses while sessions are connected unless forced |
 | `mdclaude [folder] --agents a,b` | foreground bridge with agents up front (watch the log) |
 | right-click → **All connected agents** | same range to every session |
 | **Alt+K** | re-send to the agent you used last (change at `chrome://extensions/shortcuts`) |
