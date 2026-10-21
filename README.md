@@ -87,15 +87,26 @@ cd ~/code/my-project
 mdclaude run A
 ```
 
-This starts the bridge in the background for that folder (first time only)
-and launches Claude Code already connected as "A". Open as many as you need,
-each in its own terminal:
+This starts the bridge in the background for that folder (first time only),
+creates an agent named "A", and launches Claude Code already connected as it.
+A bridge starts with no agents; each one exists because you named it. Open
+as many as you need, each in its own terminal:
 
 ```bash
 mdclaude run B          # a second session
 mdclaude run design     # names are free-form
-mdclaude run            # no name: picks the first idle agent, or makes a new one
+mdclaude run            # no name: reuses an idle agent, or makes the next lettered one
 ```
+
+Already have a Claude Code open? Attach it instead of starting a new one:
+
+```bash
+mdclaude start          # bridge only, nothing opens (skip if one is already up)
+mdclaude add review     # name a slot for it
+```
+
+then type `/ide` in that session and pick **Markdown Viewer (review)**. Its
+conversation is untouched.
 
 Now open a spec in Chrome by dragging the `.md` file onto a tab (or
 `file:///path/to/spec.md`). Highlight a passage, right-click, and choose
@@ -115,7 +126,7 @@ Other things you can do:
 | Pass flags to claude | `mdclaude run A -- --resume` |
 | Connect a Claude Code you already have open | `mdclaude start` if needed, then type `/ide` in that session and pick **Markdown Viewer (A)** |
 | Make a slot for an open session under a new name | `mdclaude add review`, then `/ide` → **Markdown Viewer (review)** |
-| Start with a fixed set of agents | `mdclaude --agents design,backend,qa` or `mdclaude --agents 4` |
+| Create several agents up front | `mdclaude start --agents design,backend,qa` or `--agents 4` |
 
 Mentions stack: send two ranges, even from two different files, and both
 appear in the prompt before you type.

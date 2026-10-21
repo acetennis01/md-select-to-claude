@@ -40,10 +40,11 @@ serve (default)  Start the bridge and keep it in the foreground.
   workspaceFolder   Folder(s) Claude Code will be run from. Defaults to cwd.
                     Claude Code only offers this bridge in /ide when its own
                     cwd is inside one of these folders.
-  --agents LIST     Named agent slots, comma separated (default: A,B), or a
-                    number to create that many lettered slots (--agents 3).
-                    Each slot is a separate "Markdown Viewer (<name>)" entry
-                    in Claude Code's /ide picker.
+  --agents LIST     Agent slots to create up front, comma separated
+                    (--agents design,qa) or a count of lettered ones
+                    (--agents 3). Default: none; "add" and "run" create them
+                    as needed. Each slot is a separate "Markdown Viewer
+                    (<name>)" entry in Claude Code's /ide picker.
   --port N          API port the Chrome extension talks to (default 41417).
                     Agent slots use N+1, N+2, ...
 
@@ -67,7 +68,7 @@ status           Show the bridge's agents and which are connected.
 `;
 
 function parseArgs(argv) {
-  const out = { cmd: 'serve', port: 41417, workspaceFolders: [], agents: ['A', 'B'], quiet: false, agent: null, claudeArgs: [] };
+  const out = { cmd: 'serve', port: 41417, workspaceFolders: [], agents: [], quiet: false, agent: null, claudeArgs: [] };
   const rest = [...argv];
   if (['serve', 'start', 'run', 'add', 'stop', 'status'].includes(rest[0])) out.cmd = rest.shift();
 
@@ -429,7 +430,7 @@ export function validateAgentName(name) {
 
 export function createBridge(opts) {
   const { port, workspaceFolders, log = () => {} } = opts;
-  const agentNames = (opts.agents ?? ['A', 'B']).map(validateAgentName);
+  const agentNames = (opts.agents ?? []).map(validateAgentName);
   const slots = agentNames.map((name, i) => createAgentSlot({ name, port: port + 1 + i, workspaceFolders, log }));
   const byName = new Map(slots.map((s) => [s.name, s]));
   const findByName = (name) => byName.get(String(name)) ?? slots.find((s) => s.name.toLowerCase() === String(name).toLowerCase());
@@ -609,11 +610,15 @@ function cmdServe(args) {
   bridge.start().then(() => {
     console.log(`[mdclaude] api:       http://127.0.0.1:${args.port}`);
     console.log(`[mdclaude] workspace: ${args.workspaceFolders.join(', ')}`);
-    console.log('[mdclaude] agents:');
-    for (const s of bridge.slots) console.log(`    ${s.name.padEnd(8)} "${s.ideName}"  ws port ${s.port}`);
+    if (bridge.slots.length) {
+      console.log('[mdclaude] agents:');
+      for (const s of bridge.slots) console.log(`    ${s.name.padEnd(8)} "${s.ideName}"  ws port ${s.port}`);
+    } else {
+      console.log('[mdclaude] agents:    none yet');
+    }
     console.log('');
-    console.log('Start a Claude Code session as an agent with:   mdclaude run A');
-    console.log('or in a running session type /ide and pick "Markdown Viewer (<agent>)".');
+    console.log('Start a Claude Code session as an agent with:   mdclaude run <name>');
+    console.log('Attach one you already have open:  mdclaude add <name>, then /ide in it.');
     console.log('');
     console.log('Then highlight text in Chrome and right-click > "Send to Claude Code" > agent.');
   }).catch((e) => {
@@ -642,7 +647,7 @@ async function ensureBridge(args) {
   const out = fs.openSync(logPath, 'a');
   const child = spawn(process.execPath, [
     fileURLToPath(import.meta.url), 'serve', ...args.workspaceFolders,
-    '--port', String(args.port), '--agents', args.agents.join(','),
+    '--port', String(args.port), ...(args.agents.length ? ['--agents', args.agents.join(',')] : []),
   ], { detached: true, stdio: ['ignore', out, out] });
   child.unref();
 
@@ -713,8 +718,13 @@ async function cmdStart(args) {
   console.log(started
     ? `[mdclaude] bridge started in the background for ${args.workspaceFolders.join(', ')}`
     : `[mdclaude] bridge already running for ${status.workspaceFolders.join(', ')}`);
-  for (const a of status.agents) console.log(`    ${a.name.padEnd(8)} "${a.ideName}"`);
-  console.log('In each open Claude Code, type /ide and pick its entry. Or: mdclaude run <agent>');
+  if (status.agents.length) {
+    for (const a of status.agents) console.log(`    ${a.name.padEnd(8)} "${a.ideName}"${a.connected ? '  connected' : ''}`);
+    console.log('In each open Claude Code, type /ide and pick its entry. Or: mdclaude run <agent>');
+  } else {
+    console.log('    no agents yet. Name one with "mdclaude add <name>" (then /ide in an open');
+    console.log('    Claude Code) or open a new session with "mdclaude run <name>".');
+  }
 }
 
 async function cmdAdd(args) {
@@ -746,6 +756,7 @@ async function cmdStatus(args) {
   const status = await fetchStatus(args.port);
   if (!status) { console.log(`[mdclaude] no bridge running on port ${args.port}`); process.exit(1); }
   console.log(`[mdclaude] bridge pid ${status.pid}, workspace: ${status.workspaceFolders.join(', ')}`);
+  if (!status.agents.length) console.log('    no agents yet');
   for (const a of status.agents) {
     console.log(`    ${a.name.padEnd(8)} ${a.connected ? `connected (${a.connected})` : 'not connected'}   "${a.ideName}"  port ${a.port}`);
   }

@@ -43,6 +43,10 @@ function menuItems(status) {
     items.push({ id: NONE_ID, title: 'Bridge not running (start: mdclaude)', enabled: false });
     return items;
   }
+  if (!status.agents.length) {
+    items.push({ id: NONE_ID, title: 'No agents yet (mdclaude run <name>)', enabled: false });
+    return items;
+  }
   for (const a of status.agents) {
     items.push({
       id: AGENT_PREFIX + a.name,

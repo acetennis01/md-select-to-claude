@@ -272,6 +272,23 @@ test('large payloads use the 16-bit / 64-bit length forms', () => {
   }
 });
 
+test('a bridge starts with no agents unless told otherwise', async () => {
+  const b0 = createBridge({ port: PORT + 20, workspaceFolders: ['/tmp/ws'] });
+  await b0.start();
+  assert.equal(b0.slots.length, 0);
+  const s = await fetch(`http://127.0.0.1:${PORT + 20}/status`).then((r) => r.json());
+  assert.deepEqual(s.agents, []);
+  // a mention with nobody to route to is accepted but delivered to no one
+  const res = await fetch(`http://127.0.0.1:${PORT + 20}/mention`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ agent: '*', filePath: '/tmp/ws/a.md', lineStart: 1, lineEnd: 1, text: 'x' }),
+  }).then((r) => r.json());
+  assert.deepEqual(res.delivered, []);
+  const added = await b0.addAgent('first');
+  assert.equal(added.port, PORT + 21);
+  await b0.stop();
+});
+
 test('stop removes every lock file', async () => {
   const b2 = createBridge({ port: PORT + 10, workspaceFolders: ['/tmp/ws'], agents: ['x', 'y', 'z'] });
   await b2.start();
