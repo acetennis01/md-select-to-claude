@@ -17,9 +17,10 @@ Then type what you want changed. No raw markdown, no copying line numbers.
 - Local only. One Node script, one unpacked Chrome extension, no dependencies.
 
 ```
-Chrome (rendered .md)            mdclaude bridge            Claude Code sessions
-highlight → right-click  ──────▶  one process  ──┬─────────▶  "Markdown Viewer (enrich)"
-→ Send to Claude Code → agent    (per-agent port) └─────────▶  "Markdown Viewer (outreach)"
+Chrome: highlight → right-click → agent      mdclaude bridge       Claude Code sessions
+          │                                  (one process,    ┌──▶ "Markdown Viewer (enrich)"
+          └── file path + line range ───────▶ one port per ───┤
+                                              agent)          └──▶ "Markdown Viewer (outreach)"
 ```
 
 ## Requirements
@@ -90,10 +91,13 @@ file at the same moment; the bridge routes, it doesn't merge.
 | `mdclaude status` | agents and who's connected |
 | `mdclaude stop <name>` | remove just that agent (disconnects its session); others keep running |
 | `mdclaude stop [--force]` | stop the whole bridge; refuses while sessions are connected unless forced |
-| `mdclaude [folder] --agents a,b` | foreground bridge with agents up front (watch the log) |
+| `mdclaude start --agents a,b` | create several agents up front (`--agents 3` for lettered ones) |
+| `mdclaude [folder]` | same as `start` but in the foreground, to watch the log |
+| `--port N` on any command | use another API port (default 41417; agents take the ports after it); set the matching URL in the extension's options page |
 | right-click → **All connected agents** | same range to every session |
 | **Alt+K** | re-send to the agent you used last (change at `chrome://extensions/shortcuts`) |
 
+Agent names: letters, digits, `-`, `_`; case-insensitive; `all` is reserved.
 Mentions stack: send several ranges, even from different files, before typing.
 The right-click menu refreshes from the bridge every 30 seconds.
 
@@ -146,7 +150,8 @@ runtime-added agents). Verified against Claude Code 2.1.306 on macOS.
 
 - The IDE protocol is reverse-engineered ([write-up](https://github.com/coder/claudecode.nvim/blob/main/PROTOCOL.md)),
   not an official API. A Claude Code release could change it.
-- `file://` pages only. Claude Code only; Cursor has no attach protocol.
+- `file://` pages only. Claude Code only: Cursor and Codex have no attach
+  protocol; Gemini CLI has a similar one and could be added.
 - Everything binds to `127.0.0.1`. Agent slots have per-run auth tokens; the
   HTTP API has none, so a local process could push a mention into a prompt,
   but nothing can read or edit files through it.
