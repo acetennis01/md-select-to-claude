@@ -14,6 +14,8 @@ Then type what you want changed. No raw markdown, no copying line numbers.
 - Any number of Claude Code sessions, each a named **agent**. Pick which one
   gets a selection, or send to all.
 - Any number of files. Each selection carries its file's path.
+- Highlighting alone shows up as live selection context in every session,
+  like Cursor; right-click pins an explicit mention to one agent.
 - Local only. One Node script, one unpacked Chrome extension, no dependencies.
 
 ```
@@ -76,6 +78,13 @@ starts one for the current folder.)
 Highlight, right-click → **Send to Claude Code** → the agent. A toast confirms
 `Sent spec.md#L12-15 to agent enrich`; switch to that session, type the change,
 press enter.
+
+**Highlighting alone is also context, like in Cursor.** Whatever you have
+selected shows up in every connected session as `⧉ N lines selected` and is
+used as context for the next message, so for a quick edit you can just
+highlight, switch to a session, and type. Right-click → agent is the explicit
+version: it pins `@spec.md#L12-15` into one agent's prompt, survives further
+highlighting, and stacks with other mentions.
 
 Two agents on two docs in the same folder is the normal case: open both docs
 in tabs and pick the agent per right-click. Avoid two agents editing the same
