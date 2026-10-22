@@ -43,6 +43,9 @@ npm install -g ./bridge        # puts `mdclaude` on your PATH; downloads nothing
 
 In Chrome: `chrome://extensions` → **Developer mode** on → **Load unpacked** →
 choose the `extension/` folder → **Details** → **Allow access to file URLs** on.
+(A Chrome Web Store listing is in progress; once live, installing from there
+replaces the Load-unpacked step, but **Allow access to file URLs** still has
+to be switched on by hand.)
 
 ## Use
 
@@ -155,6 +158,11 @@ node --test test/
 Matcher tests run against a fixture spec; bridge tests connect a hand-rolled
 WebSocket client that behaves like Claude Code (auth, MCP handshake, routing,
 runtime-added agents). Verified against Claude Code 2.1.306 on macOS.
+
+Store release: `tools/package-extension.sh` builds the upload zip,
+`tools/store-listing.md` has the listing text and permission justifications,
+`tools/make-icons.mjs` regenerates the icons, [PRIVACY.md](PRIVACY.md) is the
+policy the store links to.
 
 ## Caveats
 
