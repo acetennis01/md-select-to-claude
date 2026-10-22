@@ -1,7 +1,8 @@
 # md-select-to-claude
 
-Highlight text in a **rendered** markdown file in Chrome, right-click, and
-send it to a Claude Code session as an exact line reference:
+Highlight text in a **rendered** markdown file in Chrome and it becomes
+context in your Claude Code session, as an exact line reference. Right-click
+to pin it to a specific session:
 
 ```
 ❯ [⧉ 4 lines selected] @spec.md#L12-15
